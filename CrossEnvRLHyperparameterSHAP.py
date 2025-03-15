@@ -10,7 +10,6 @@ import time
 from tqdm import tqdm
 import os
 import argparse
-import random  # Import random module for generating random seeds
 from glob import glob
 from sklearn.ensemble import RandomForestRegressor
 from stable_baselines3 import PPO, A2C, DDPG, SAC, TD3
@@ -120,7 +119,7 @@ def load_results(path):
 
 # Analysis class for training and testing with different environments
 class CrossEnvRLHyperparameter(RLHyperparameter):
-    def __init__(self, train_env_name, test_env_name, algorithm, param_grid, n_samples=50, random_state=42, 
+    def __init__(self, train_env_name, test_env_name, algorithm, param_grid, n_samples=50, seed=None, 
                  train_steps=100000, eval_episodes=10, log_dir=None, device="cpu"):
         """
         Initialize cross-environment RL hyperparameter SHAP analysis
@@ -137,8 +136,8 @@ class CrossEnvRLHyperparameter(RLHyperparameter):
             Hyperparameter ranges, including algorithm selection
         n_samples : int
             Number of hyperparameter combinations to sample
-        random_state : int
-            Random seed
+        seed : int
+            Random or fixed seed
         train_steps : int
             Total steps to train the RL algorithm
         eval_episodes : int
@@ -153,7 +152,7 @@ class CrossEnvRLHyperparameter(RLHyperparameter):
             algorithm=algorithm,
             param_grid=param_grid,
             n_samples=n_samples,
-            random_state=random_state,
+            seed=seed,
             train_steps=train_steps,
             eval_episodes=eval_episodes,
             log_dir=log_dir if log_dir else "./rl_cross_env_hyperparams_logs",
@@ -171,26 +170,26 @@ class CrossEnvRLHyperparameter(RLHyperparameter):
         
         # Create training environment
         train_env = gymnasium.make(self.train_env_name)
-        train_env.reset(seed=self.random_state)
+        train_env.reset(seed=self.seed)
         train_env = Monitor(train_env, os.path.join(run_log_dir, "train_monitor"))
         
         # Create testing environment
         test_env = gym.make(self.test_env_name)
-        test_env.seed(seed=self.random_state)
+        test_env.seed(seed=self.seed)
         test_env.reset()
         test_env = GymMonitor(test_env, os.path.join(run_log_dir, "test_monitor"))
         
         # Select and create model
         if self.algorithm == 'PPO':
-            model = PPO("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = PPO("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         elif self.algorithm == 'A2C':
-            model = A2C("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = A2C("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         elif self.algorithm == 'DDPG':
-            model = DDPG("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = DDPG("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         elif self.algorithm == 'SAC':
-            model = SAC("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = SAC("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         elif self.algorithm == 'TD3':
-            model = TD3("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = TD3("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         else:
             raise ValueError(f"Unsupported RL algorithm: {self.algorithm}")
         
@@ -263,8 +262,6 @@ class CrossEnvRLHyperparameter(RLHyperparameter):
 # Cross-environment analysis example
 def cross_environment_analysis_example(algorithms=None, env_pairs=None, n_samples=5, train_steps=100, eval_episodes=10, 
                                        target="generalization_gap", log_dir="./rl_cross_env_analysis_results", seed=None, device="cpu"):
-    # Use a random seed if none is provided
-    print(f"Using random seed: {seed}")
     
     # Define RL algorithms and hyperparameter grids
     rl_param_grids = {
@@ -337,7 +334,7 @@ def cross_environment_analysis_example(algorithms=None, env_pairs=None, n_sample
                 algorithm=algorithm,
                 param_grid=param_grid,
                 n_samples=n_samples,
-                random_state=seed,  # Use the random seed
+                seed=seed,
                 train_steps=train_steps,
                 eval_episodes=eval_episodes,
                 log_dir=os.path.join(log_dir, algorithm, train_env),
@@ -355,11 +352,10 @@ def cross_environment_analysis_example(algorithms=None, env_pairs=None, n_sample
         os.makedirs(os.path.join(log_dir, algorithm), exist_ok=True)
         combined_results_df.to_csv(os.path.join(log_dir, algorithm, "combined_results.csv"), index=False)
         print(f"param_grid: {param_grid}")
-        print(f"seed: {seed}")
         explainer = SHAPExplainer(param_grid=param_grid, 
                                 results=combined_results_df, 
                                 log_dir=os.path.join(log_dir, algorithm), 
-                                random_state=seed)
+                                seed=seed)
 
         # Analyze results
         explainer.plot_summary(target)
@@ -399,20 +395,11 @@ if __name__ == "__main__":
     parser.add_argument('--log_dir', type=str, default="./rl_cross_env_analysis_results",
                         help='Directory for saving results')
     parser.add_argument('--seed', type=int, default=None,  # Changed default to None for random seed
-                        help='Random seed (default: random value)')
+                        help='Random or fixed seed for SHAP reproducibility')
     parser.add_argument('--device', type=str, default="cpu",
                         help='Device to use for training (cpu or cuda)')
     
     args = parser.parse_args()
-    
-    # Set global random seed if provided
-    if args.seed is not None:
-        np.random.seed(args.seed)
-    else:
-        # Generate a random seed and use it
-        random_seed = random.randint(0, 100000)
-        np.random.seed(random_seed)
-        args.seed = random_seed
     
     # Run the analysis with command line arguments
     cross_environment_analysis_example(

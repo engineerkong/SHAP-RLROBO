@@ -2,8 +2,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import shap
-import gymnasium as gym
+import gymnasium
 import time
+import random # Import random module for generating random seeds
 from tqdm import tqdm
 import os
 from sklearn.ensemble import RandomForestRegressor
@@ -12,7 +13,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
 
 class RLHyperparameter:
-    def __init__(self, env_name, algorithm, param_grid, n_samples=50, random_state=42, 
+    def __init__(self, env_name, algorithm, param_grid, n_samples=50, seed=None, 
                  train_steps=100000, eval_episodes=10, log_dir=None, device="cpu"):
         """
         Initialize RL hyperparameter SHAP analysis
@@ -25,8 +26,8 @@ class RLHyperparameter:
             Hyperparameter range, including algorithm selection
         n_samples : int
             Number of hyperparameter combinations to sample
-        random_state : int
-            Random seed
+        seed : int
+            Random or fixed seed
         train_steps : int
             Total steps to train the RL algorithm
         eval_episodes : int
@@ -40,7 +41,7 @@ class RLHyperparameter:
         self.algorithm = algorithm
         self.param_grid = param_grid
         self.n_samples = n_samples
-        self.random_state = random_state
+        self.seed = seed
         self.train_steps = train_steps
         self.eval_episodes = eval_episodes
         
@@ -49,8 +50,6 @@ class RLHyperparameter:
 
         self.device = device
         self.results = None
-        
-        np.random.seed(random_state)
     
     def sample_hyperparameters(self):
         """Randomly sample hyperparameter combinations"""
@@ -87,26 +86,26 @@ class RLHyperparameter:
         os.makedirs(run_log_dir, exist_ok=True)
         
         # Create training environment - use standard seed
-        train_env = gym.make(self.env_name)
-        observation, info = train_env.reset(seed=self.random_state)
+        train_env = gymnasium.make(self.env_name)
+        observation, info = train_env.reset(seed=self.seed)
         train_env = Monitor(train_env, os.path.join(run_log_dir, "train_monitor"))
         
         # Create testing environment - use different seed
-        test_env = gym.make(self.env_name)
-        observation, info = test_env.reset(seed=self.random_state + 100)
+        test_env = gymnasium.make(self.env_name)
+        observation, info = test_env.reset(seed=self.seed + 100)
         test_env = Monitor(test_env, os.path.join(run_log_dir, "test_monitor"))
         
         # Select and create model
         if self.algorithm == 'PPO':
-            model = PPO("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = PPO("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         elif self.algorithm == 'A2C':
-            model = A2C("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = A2C("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         elif self.algorithm == 'DDPG':
-            model = DDPG("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = DDPG("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         elif self.algorithm == 'SAC':
-            model = SAC("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = SAC("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         elif self.algorithm == 'TD3':
-            model = TD3("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.random_state, device=self.device, **params)
+            model = TD3("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
         else:
             raise ValueError(f"Unsupported RL algorithm: {self.algorithm}")
         
@@ -147,6 +146,12 @@ class RLHyperparameter:
             for param_name, param_value in params.items():
                 print(f"  {param_name}: {param_value}")
                 
+            # Generate a random seed and use it (TODO: ignored orignal seed)
+            seed = random.randint(0, 100000)
+            np.random.seed(seed)
+            self.seed = seed
+            print(f"Using random seed on RLROBO: {self.seed}")
+
             perf_metrics = self.evaluate_generalization(params, run_id=i)
             result = {**params, **perf_metrics}
             results.append(result)
@@ -172,7 +177,7 @@ class SHAPExplainer:
     A class for explaining the impact of hyperparameters on RL performance using SHAP values.
     This class encapsulates all explainability-related functionality.
     """
-    def __init__(self, param_grid, results, log_dir, random_state=42):
+    def __init__(self, param_grid, results, log_dir, seed=None):
         """
         Initialize the SHAP explainer
         
@@ -184,16 +189,27 @@ class SHAPExplainer:
             Results dataframe containing hyperparameters and performance metrics
         log_dir : str
             Directory to save plots and results
-        random_state : int
-            Random seed for reproducibility
+        seed : int
+            Random or fixed seed
         """
         self.param_grid = param_grid
         self.results = results
         self.log_dir = log_dir
-        self.random_state = random_state
+        self.seed = seed
         self.meta_model = None
         self.explainer = None
     
+        # Set global fixed seed if provided
+        if self.seed is not None:
+            np.random.seed(self.seed)
+            print(f"Using fixed seed on RLROBO: {self.seed}")
+        else:
+            # Generate a random seed and use it
+            seed = random.randint(0, 100000)
+            np.random.seed(seed)
+            self.seed = seed
+            print(f"Using random seed on SHAP: {self.seed}")
+
     def train_meta_model(self, target):
         """
         Train a meta-model to predict performance based on hyperparameters
@@ -202,7 +218,7 @@ class SHAPExplainer:
         y = self.results[target]
         
         # Use random forest as the meta-model
-        self.meta_model = RandomForestRegressor(n_estimators=100, random_state=self.random_state)
+        self.meta_model = RandomForestRegressor(n_estimators=100, seed=self.seed)
         self.meta_model.fit(X, y)
         
         # Evaluate meta-model performance
