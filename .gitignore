@@ -1,0 +1,7 @@
+*.py[cod]
+/__pycache__/*
+/.vscode/*
+/_archive/*
+/gym/
+/pybullet-gym/
+/rl_cross_env_analysis_results/
