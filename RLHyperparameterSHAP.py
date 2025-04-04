@@ -14,7 +14,7 @@ from stable_baselines3.common.monitor import Monitor
 
 class RLHyperparameter:
     def __init__(self, env_name, algorithm, param_grid, n_samples=50, seed=None, 
-                 train_steps=100000, eval_episodes=10, log_dir=None, device="cpu"):
+                 train_steps=100000, eval_episodes=10, log_dir=None, device="cuda:0"):
         """
         Initialize RL hyperparameter SHAP analysis
         
@@ -218,7 +218,7 @@ class SHAPExplainer:
         y = self.results[target]
         
         # Use random forest as the meta-model
-        self.meta_model = RandomForestRegressor(n_estimators=100, seed=self.seed)
+        self.meta_model = RandomForestRegressor(n_estimators=100)
         self.meta_model.fit(X, y)
         
         # Evaluate meta-model performance
@@ -260,6 +260,12 @@ class SHAPExplainer:
         # shap.summary_plot(shap_values, X)
         shap.plots.violin(shap_values, X, plot_type="layered_violin")
         plt.title(f'SHAP Summary Plot for {target}')
+        # Set x-axis range as a factor of the original range
+        x_min, x_max = plt.xlim()  # Get current limits
+        x_range = x_max - x_min
+        factor = 0.6  # Adjust this factor as needed (1.2 = 20% wider than original range)
+        center = (x_max + x_min) / 2
+        plt.xlim(center - x_range * factor / 2, center + x_range * factor / 2)
         plt.tight_layout()
         plt.savefig(os.path.join(self.log_dir, f'shap_summary_{target}.png'))
         

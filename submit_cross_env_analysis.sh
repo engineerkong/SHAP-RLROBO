@@ -1,14 +1,13 @@
 #!/bin/bash
 
 # Default values
-ALGORITHM="PPO"
-TRAIN_ENV="InvertedPendulum-v5"
-TEST_ENV="InvertedPendulumMuJoCoEnv-v0"
+ALGORITHM="A2C"
+ENV_PAIRS="Hopper-v5,HopperMuJoCoEnv-v0"
 N_SAMPLES=500
 TRAIN_STEPS=100000
 EVAL_EPISODES=20
 TARGET="generalization_gap"
-LOG_DIR=""
+LOG_DIR="rl_cross_env_analysis_results"
 DEVICE="cuda:0"
 RUN_ALL_PAIRS=true
 
@@ -18,11 +17,8 @@ while [[ $# -gt 0 ]]; do
     --algorithm=*)
       ALGORITHM="${1#*=}"
       ;;
-    --train_env=*)
-      TRAIN_ENV="${1#*=}"
-      ;;
-    --test_env=*)
-      TEST_ENV="${1#*=}"
+    --env_pairs=*)
+      ENV_PAIRS="${1#*=}"
       ;;
     --n_samples=*)
       N_SAMPLES="${1#*=}"
@@ -38,6 +34,9 @@ while [[ $# -gt 0 ]]; do
       ;;
     --log_dir=*)
       LOG_DIR="${1#*=}"
+      ;;
+    --device=*)
+      DEVICE="${1#*=}"
       ;;
     --run_all_pairs)
       RUN_ALL_PAIRS=true
@@ -57,9 +56,9 @@ if $RUN_ALL_PAIRS; then
     LOG_DIR="rl_cross_env_analysis_results"
   fi
 else
-  JOB_NAME="${ALGORITHM}_${TRAIN_ENV}_to_${TEST_ENV}"
+  JOB_NAME="${ALGORITHM}_${ENV_PAIRS}"
   if [ -z "$LOG_DIR" ]; then
-    LOG_DIR="rl_cross_env_analysis_results/${TRAIN_ENV}_to_${TEST_ENV}"
+    LOG_DIR="rl_cross_env_analysis_results/${ENV_PAIRS}"
   fi
 fi
 
@@ -72,10 +71,10 @@ cat << EOF > job_${JOB_NAME}.sbatch
 #SBATCH --job-name=${JOB_NAME}
 #SBATCH --output=${LOG_DIR}/slurm_%j.out
 #SBATCH --error=${LOG_DIR}/slurm_%j.err
-#SBATCH --time=120:00:00
+#SBATCH --time=336:00:00  # This is already 14 days, which is good
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
+#SBATCH --cpus-per-task=8  # Increase from 4 to 8
+#SBATCH --mem=32G  # Increase from 16G to 32G
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 
@@ -113,22 +112,24 @@ if $RUN_ALL_PAIRS; then
   
   # Run the analysis script with all pairs
   python CrossEnvRLHyperparameterSHAP.py \
-    --algorithm ${ALGORITHM} \
+    --algorithms ${ALGORITHM} \
     --n_samples ${N_SAMPLES} \
     --train_steps ${TRAIN_STEPS} \
     --eval_episodes ${EVAL_EPISODES} \
-    --log_dir ${LOG_DIR}
+    --log_dir ${LOG_DIR} \
+    --device ${DEVICE}
 else
-  echo "Train Environment: ${TRAIN_ENV}, Test Environment: ${TEST_ENV}"
+  echo "Run environment pairs: ${ENV_PAIRS}"
   
   # Run the analysis script for a single pair
   python CrossEnvRLHyperparameterSHAP.py \
-    --algorithm ${ALGORITHM} \
-    --env_pairs ${TRAIN_ENV, TEST_ENV} \
+    --algorithms ${ALGORITHM} \
+    --env_pairs ${ENV_PAIRS} \
     --n_samples ${N_SAMPLES} \
     --train_steps ${TRAIN_STEPS} \
     --eval_episodes ${EVAL_EPISODES} \
-    --log_dir ${LOG_DIR}
+    --log_dir ${LOG_DIR} \
+    --device ${DEVICE}
 fi
 
 echo "Job completed at \$(date)"
@@ -139,7 +140,7 @@ sbatch job_${JOB_NAME}.sbatch
 if $RUN_ALL_PAIRS; then
   echo "Submitted job for ${ALGORITHM} on all environment pairs"
 else
-  echo "Submitted job for ${ALGORITHM} on ${TRAIN_ENV} -> ${TEST_ENV}"
+  echo "Submitted job for ${ALGORITHM} on ${ENV_PAIRS}"
 fi
 echo "Log directory: ${LOG_DIR}"
 echo "To monitor training status: cat ${LOG_DIR}/status.txt"

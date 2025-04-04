@@ -120,7 +120,7 @@ def load_results(path):
 # Analysis class for training and testing with different environments
 class CrossEnvRLHyperparameter(RLHyperparameter):
     def __init__(self, train_env_name, test_env_name, algorithm, param_grid, n_samples=50, seed=None, 
-                 train_steps=100000, eval_episodes=10, log_dir=None, device="cpu"):
+                 train_steps=100000, eval_episodes=10, log_dir=None, device="cuda:0"):
         """
         Initialize cross-environment RL hyperparameter SHAP analysis
         
@@ -179,6 +179,7 @@ class CrossEnvRLHyperparameter(RLHyperparameter):
         test_env.reset()
         test_env = GymMonitor(test_env, os.path.join(run_log_dir, "test_monitor"))
         
+        print(self.device)
         # Select and create model
         if self.algorithm == 'PPO':
             model = PPO("MlpPolicy", train_env, verbose=0, tensorboard_log=run_log_dir, seed=self.seed, device=self.device, **params)
@@ -261,7 +262,7 @@ class CrossEnvRLHyperparameter(RLHyperparameter):
 
 # Cross-environment analysis example
 def cross_environment_analysis_example(algorithms=None, env_pairs=None, n_samples=5, train_steps=100, eval_episodes=10, 
-                                       target="generalization_gap", log_dir="./rl_cross_env_analysis_results", seed=None, device="cpu"):
+                                       target="generalization_gap", log_dir="./rl_cross_env_analysis_results", seed=None, device="cuda:0"):
     
     # Define RL algorithms and hyperparameter grids
     rl_param_grids = {
@@ -274,7 +275,7 @@ def cross_environment_analysis_example(algorithms=None, env_pairs=None, n_sample
         },
         'A2C': {
             'learning_rate': (0.0001, 0.01),
-            'gamma': (0.9, 0.999),
+            'gamma': (0.8, 0.999), # TODO
             'n_steps': [128, 512, 1024, 2048],
             'gae_lambda': (0.9, 0.99),
             'vf_coef': (0.5, 1.0)
@@ -386,7 +387,7 @@ if __name__ == "__main__":
                         help='Environment pairs to test (format: "env1,env2")')
     parser.add_argument('--n_samples', type=int, default=5,
                         help='Number of hyperparameter combinations to sample')
-    parser.add_argument('--train_steps', type=int, default=100,
+    parser.add_argument('--train_steps', type=int, default=100000,
                         help='Number of training steps for each run')
     parser.add_argument('--eval_episodes', type=int, default=10,
                         help='Number of episodes for evaluation')
@@ -396,7 +397,7 @@ if __name__ == "__main__":
                         help='Directory for saving results')
     parser.add_argument('--seed', type=int, default=None,  # Changed default to None for random seed
                         help='Random or fixed seed for SHAP reproducibility')
-    parser.add_argument('--device', type=str, default="cpu",
+    parser.add_argument('--device', type=str, default="cuda:0",
                         help='Device to use for training (cpu or cuda)')
     
     args = parser.parse_args()
