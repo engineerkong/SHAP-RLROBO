@@ -6,6 +6,7 @@ import shap
 import time
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
+import matplotlib.colors as mcolors
 
 class SHAPExplainer:
     """
@@ -83,27 +84,26 @@ class SHAPExplainer:
         """
         shap_values, X = self.explain(target)
         
+        # Beeswarm plot showing feature impacts
+        plt.figure(figsize=(12, 8))
+        shap.plots.violin(shap_values, X, plot_type="layered_violin")
+        plt.title(f'SHAP Summary Plot for {target}')
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.log_dir, f'shap_summary_{target}.png'))
+
+    def plot_importance(self, target):
+        """
+        Plot SHAP importance visualizations
+        """                
+        shap_values, X = self.explain(target)
+        
         # Bar plot of feature importance
         plt.figure(figsize=(10, 6))
         shap.summary_plot(shap_values, X, plot_type="bar")
         plt.title(f'SHAP Value Importance for {target}')
         plt.tight_layout()
         plt.savefig(os.path.join(self.log_dir, f'shap_importance_{target}.png'))
-        
-        # Beeswarm plot showing feature impacts
-        plt.figure(figsize=(12, 8))
-        # shap.summary_plot(shap_values, X)
-        shap.plots.violin(shap_values, X, plot_type="layered_violin")
-        plt.title(f'SHAP Summary Plot for {target}')
-        # Set x-axis range as a factor of the original range
-        x_min, x_max = plt.xlim()  # Get current limits
-        x_range = x_max - x_min
-        factor = 0.6  # Adjust this factor as needed (1.2 = 20% wider than original range)
-        center = (x_max + x_min) / 2
-        plt.xlim(center - x_range * factor / 2, center + x_range * factor / 2)
-        plt.tight_layout()
-        plt.savefig(os.path.join(self.log_dir, f'shap_summary_{target}.png'))
-        
+
     def plot_dependence(self, param_name, target, interaction_index=None):
         """
         Plot dependence of target on a specific parameter
@@ -142,6 +142,13 @@ class SHAPExplainer:
         plt.title(f'Interaction between {param1} and {param2} on {target}')
         plt.tight_layout()
         plt.savefig(os.path.join(self.log_dir, f'shap_interaction_{param1}_{param2}_{target}.png'))
+
+        # X["feature_3_bin"] = pd.qcut(X["feature_3"], q=4)  # Bin into quartiles
+        # for bin_name in X["feature_3_bin"].unique():
+        #     subset = X[X["feature_3_bin"] == bin_name]
+        #     shap.dependence_plot("feature_1", shap_values[subset.index], subset, 
+        #                         interaction_index="feature_2", 
+        #                         title=f"Feature 3 Bin: {bin_name}")
         
     def plot_decision(self, target):
         """
@@ -157,13 +164,9 @@ class SHAPExplainer:
         """
         Print and save the best hyperparameter combination
         """
-        # For generalization gap, we want to minimize it; for rewards, we want to maximize them
-        if target == 'generalization_gap':
-            best_idx = self.results[target].idxmin()
-            print(f"Best hyperparameters for minimizing {target}:")
-        else:
-            best_idx = self.results[target].idxmax()
-            print(f"Best hyperparameters for maximizing {target}:")
+        # We maximize the target metric
+        best_idx = self.results[target].idxmax()
+        print(f"Best hyperparameters for maximizing {target}:")
             
         best_params = self.results.loc[best_idx, list(self.param_grid.keys())]
         best_performance = self.results.loc[best_idx, target]
@@ -180,73 +183,116 @@ class SHAPExplainer:
             os.path.join(self.log_dir, f'best_params_{target}.csv')
         )
 
-rl_param_grids = {
-    'PPO': {
-        'learning_rate': (0.0001, 0.01),
-        'gamma': (0.8, 0.999),
-        'batch_size': [64, 128, 256],
-        'n_steps': [128, 512, 1024, 2048],
-        'clip_range': (0.1, 0.3)
-    },
-    'A2C': {
-        'learning_rate': (0.0001, 0.01),
-        'gamma': (0.9, 0.999),
-        'n_steps': [128, 512, 1024, 2048],
-        'gae_lambda': (0.9, 0.99),
-        'vf_coef': (0.5, 1.0)
-    },
-    'DDPG': {
-        'learning_rate': (0.0001, 0.01),
-        'gamma': (0.8, 0.999),
-        'batch_size': [64, 128, 256],
-        'tau': (0.005, 0.01),
-        'buffer_size': [10000, 100000, 1000000]
-    },
-    'SAC': {
-        'learning_rate': (0.0001, 0.01),
-        'gamma': (0.8, 0.999),
-        'batch_size': [64, 128, 256],
-        'tau': (0.005, 0.01),
-        'ent_coef': (0.1, 1.0)
-    },
-    # 'TD3': {
-    #     'learning_rate': (0.0001, 0.01),
-    #     'gamma': (0.8, 0.999),
-    #     'batch_size': [64, 128, 256],
-    #     'tau': (0.005, 0.01),
-    #     'policy_delay': [1, 2]
-    # }
-}
-log_dir = "/home/lin30127/workspace/SHAP-RLROBO/results"
+def process_results(rl_param_grids, log_dir):
+    """
+    Process results for each algorithm and perform SHAP analysis
+    """
+    all_algorithms_df = pd.DataFrame()
+    all_param_keys = set()
+    algorithm_encoding = {'PPO': 0, 'A2C': 1, 'DDPG': 2, 'SAC': 3}
+    env_df = {"InvertedPendulum":pd.DataFrame(), "HalfCheetah":pd.DataFrame(), "Hopper":pd.DataFrame(), "Walker2d":pd.DataFrame()}
+    for algorithm, param_grid in rl_param_grids.items():
+        combined_results = pd.read_csv(f"/home/lin30127/workspace/SHAP-RLROBO/results/{algorithm}_combined_results.csv")
+        env_df['InvertedPendulum'] = pd.concat([env_df['InvertedPendulum'], combined_results[1:501]], ignore_index=True)
+        env_df['HalfCheetah'] = pd.concat([env_df['HalfCheetah'], combined_results[501:1001]], ignore_index=True)
+        env_df['Hopper'] = pd.concat([env_df['Hopper'], combined_results[1001:1501]], ignore_index=True)
+        env_df['Walker2d'] = pd.concat([env_df['Walker2d'], combined_results[1501:2001]], ignore_index=True)
+        combined_train_reward = combined_results["train_reward"]
+        combined_test_reward = combined_results["test_reward"]
 
-for algorithm, param_grid in rl_param_grids.items():
-    combined_results = pd.read_csv(f"/home/lin30127/workspace/SHAP-RLROBO/results/{algorithm}_combined_results.csv")
-    combined_train_reward = combined_results["train_reward"]
-    combined_train_reward_std = combined_results["train_reward_std"]
-    combined_test_reward = combined_results["test_reward"]
-    combined_test_reward_std = combined_results["test_reward_std"]
+        # Calculate the gap between test and train performance
+        combined_results["gap"] = (combined_test_reward - combined_train_reward)
+        # Add algorithm as a feature
+        combined_results["algorithm"] = algorithm_encoding[algorithm]
+        # Save processed data to new CSV
+        output_path = f"{log_dir}/{algorithm}_processed_results.csv"
+        combined_results.to_csv(output_path, index=False)
+        print(f"Saved processed results for {algorithm} to {output_path}")
+        all_algorithms_df = pd.concat([all_algorithms_df, combined_results], ignore_index=True)
 
-    # Calculate the gap between test and train performance
-    combined_results["gap"] = (combined_test_reward - combined_train_reward) # * (combined_test_reward_std / combined_train_reward_std)
-    # Create DataFrame for SHAP analysis
-    combined_results_df = combined_results
+    for env, df in env_df.items():
+        # Save processed data to new CSV
+        output_path = f"{log_dir}/{env}_processed_results.csv"
+        df.to_csv(output_path, index=False)
+        print(f"Saved processed results for {env} to {output_path}")
+    all_algorithms_df.to_csv(os.path.join(log_dir, "all_algorithms_combined_results.csv"), index=False)
+    print(f"Saved combined results for all algorithms to {os.path.join(log_dir, 'all_algorithms_combined_results.csv')}")
 
-    target = "gap"  # Use the gap as the target variable for analysis
-    # Combine results from all environment pairs
-    os.makedirs(os.path.join(log_dir, algorithm), exist_ok=True)
-    print(f"algorithm: {algorithm}")
-    print(f"param_grid: {param_grid}")
-    explainer = SHAPExplainer(param_grid=param_grid, 
-                            results=combined_results_df, 
-                            log_dir=os.path.join(log_dir, algorithm))
+def main():
+    log_dir = "/home/lin30127/workspace/SHAP-RLROBO/results/experiments/"
+    os.makedirs(os.path.join(log_dir, "combined_analysis"), exist_ok=True)
+    
+    rl_param_grids = {
+        'PPO': {
+            'learning_rate': (0.0001, 0.01),
+            'gamma': (0.8, 0.999),
+            'batch_size': [64, 128, 256],
+            'n_steps': [128, 512, 1024, 2048],
+            'clip_range': (0.1, 0.3)
+        },
+        'A2C': {
+            'learning_rate': (0.0001, 0.01),
+            'gamma': (0.9, 0.999),
+            'n_steps': [128, 512, 1024, 2048],
+            'gae_lambda': (0.9, 0.99),
+            'vf_coef': (0.5, 1.0)
+        },
+        'DDPG': {
+            'learning_rate': (0.0001, 0.01),
+            'gamma': (0.8, 0.999),
+            'batch_size': [64, 128, 256],
+            'tau': (0.005, 0.01),
+            'buffer_size': [10000, 100000, 1000000]
+        },
+        'SAC': {
+            'learning_rate': (0.0001, 0.01),
+            'gamma': (0.8, 0.999),
+            'batch_size': [64, 128, 256],
+            'tau': (0.005, 0.01),
+            'ent_coef': (0.1, 1.0)
+        }
+    }
+    # Process results for each algorithm
+    process_results(rl_param_grids, log_dir)
 
-    # # Analyze results
-    # explainer.plot_summary(target)
-    # # Analyze important hyperparameters
-    # for param in param_grid.keys():
-    #     explainer.plot_dependence(param, target)
-    # # Print optimal hyperparameter combinations
-    # explainer.print_optimal_hyperparams(target)
-    explainer.plot_interaction("learning_rate", "gamma", target)
+    # Experiment 1
+    for algorithm, param_grid in rl_param_grids.items():
+        # Read the combined results for each algorithm
+        combined_results = pd.read_csv(f"/home/lin30127/workspace/SHAP-RLROBO/results/{algorithm}_processed_results.csv")
+        target = "gap"  # Use the gap as the target variable for analysis
+        os.makedirs(os.path.join(log_dir, algorithm), exist_ok=True)
+        print(f"algorithm: {algorithm}")
+        print(f"param_grid: {param_grid}")
+        explainer = SHAPExplainer(param_grid=param_grid, 
+                                results=combined_results, 
+                                log_dir=os.path.join(log_dir, algorithm))
+        explainer.plot_summary(target) # experiment 1
 
-print(f"Cross-environment analysis complete for {algorithm}. Results saved in {log_dir}.")
+    combined_param_grid = {'algorithm': [0, 1, 2, 3], 'learning_rate': (0.0001, 0.01), 'gamma': (0.8, 0.999)}    
+    
+    # Experiment 2
+    all_algorithms_df = pd.read_csv(os.path.join(log_dir, "all_algorithms_combined_results.csv"))
+    combined_explainer = SHAPExplainer(
+        param_grid=combined_param_grid,
+        results=all_algorithms_df,
+        log_dir=os.path.join(log_dir, "combined_analysis")
+    )    
+    combined_explainer.plot_dependence("algorithm", target) # experiment 2
+    combined_explainer.plot_dependence("learning_rate", target) # experiment 2
+    combined_explainer.plot_dependence("gamma", target) # experiment 2
+    combined_explainer.plot_interaction("learning_rate", "gamma", target) # experiment 2
+
+    # Experiment 3
+    envs = ["InvertedPendulum", "HalfCheetah", "Hopper", "Walker2d"]
+    for env in envs:
+        env_df = pd.read_csv(os.path.join(log_dir, f"{env}_processed_results.csv"))
+        print(f"env: {env}")
+        print(f"param_grid: {rl_param_grids}")
+        explainer = SHAPExplainer(param_grid=combined_param_grid, 
+                                results=env_df, 
+                                log_dir=os.path.join(log_dir, env))
+        explainer.plot_importance(target)
+    
+    # Experiment 4
+    combined_explainer.print_optimal_hyperparams(target)
+    combined_explainer.plot_decision(target)
