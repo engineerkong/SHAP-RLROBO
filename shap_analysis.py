@@ -37,7 +37,7 @@ rl_param_grids = {
     #     'batch_size': [64, 128, 256],
     #     'tau': (0.005, 0.01),
     #     'policy_delay': [1, 2]
-    }
+    # }
 }
 log_dir = "/home/lin30127/workspace/SHAP-RLROBO/results"
 
