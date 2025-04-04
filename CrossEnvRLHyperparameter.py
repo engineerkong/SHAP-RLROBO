@@ -17,7 +17,8 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 from gym_monitor import Monitor as GymMonitor
-from RLHyperparameterSHAP import RLHyperparameter, SHAPExplainer
+from RLHyperparameter import RLHyperparameter
+from SHAPAnalysis import SHAPExplainer
 
 # Custom callback for early stopping based on training plateau
 class EarlyStoppingCallback(BaseCallback):
@@ -294,13 +295,13 @@ def cross_environment_analysis_example(algorithms=None, env_pairs=None, n_sample
             'tau': (0.005, 0.01),
             'ent_coef': (0.1, 1.0)
         },
-        'TD3': {
-            'learning_rate': (0.0001, 0.01),
-            'gamma': (0.8, 0.999),
-            'batch_size': [64, 128, 256],
-            'tau': (0.005, 0.01),
-            'policy_delay': [1, 2]
-        }
+        # 'TD3': {
+        #     'learning_rate': (0.0001, 0.01),
+        #     'gamma': (0.8, 0.999),
+        #     'batch_size': [64, 128, 256],
+        #     'tau': (0.005, 0.01),
+        #     'policy_delay': [1, 2]
+        # }
     }
 
     default_env_pairs = [
