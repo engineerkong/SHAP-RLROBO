@@ -6,6 +6,9 @@
 /pybullet-gym/
 /rl_cross_env_analysis_results/
 /rl_cross_env/
-/results/
 /results_archive/
+/results_archive2/
+/logs/
+/analysis/
+/analysis_archive/
 /rl-baselines3-zoo/

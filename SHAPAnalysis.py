@@ -7,6 +7,7 @@ import time
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 import matplotlib.colors as mcolors
+import argparse
 
 class SHAPExplainer:
     """
@@ -390,6 +391,10 @@ def process_results(rl_param_grids, log_dir):
     print(f"Saved combined results for all algorithms to {os.path.join(log_dir, 'all_algorithms_combined_results.csv')}")
 
 def main():
+    parser = argparse.ArgumentParser(description="SHAP Analysis for RL experiments")
+    parser.add_argument('--process', type=str, help='Process to be chosen', default='all')
+    args = parser.parse_args()
+
     log_dir = "/home/lin30127/workspace/SHAP-RLROBO/results/experiments/"
     target = "gap"  # Use the gap as the target variable for analysis  
 
@@ -423,62 +428,67 @@ def main():
             'ent_coef': (0.1, 1.0)
         }
     }
-    # # Process results for each algorithm
-    # process_results(rl_param_grids, log_dir)
-
-    # # # Experiment 1
-    # for algorithm, param_grid in rl_param_grids.items():
-    #     # Read the combined results for each algorithm
-    #     processed_results = pd.read_csv(f"{log_dir}{algorithm}_processed_results.csv")
-    #     os.makedirs(os.path.join(log_dir, algorithm), exist_ok=True)
-    #     print(f"algorithm: {algorithm}")
-    #     print(f"param_grid: {param_grid}")
-    #     explainer = SHAPExplainer(param_grid=param_grid, 
-    #                             results=processed_results, 
-    #                             log_dir=os.path.join(log_dir, algorithm))
-    #     explainer.plot_summary(algorithm, target)
-
-    
-    # Experiment 2
-    combined_param_grid = {'algorithm': [0, 1, 2, 3], 'learning_rate': (0.0001, 0.01), 'gamma': (0.8, 0.999)}    
-    all_algorithms_df = pd.read_csv(os.path.join(log_dir, "all_algorithms_combined_results.csv"))
-    os.makedirs(os.path.join(log_dir, "combined_analysis"), exist_ok=True)
-    combined_explainer = SHAPExplainer(
-        param_grid=combined_param_grid,
-        results=all_algorithms_df,
-        log_dir=os.path.join(log_dir, "combined_analysis")
-    )    
-    combined_explainer.plot_dependence("algorithm", target, '#1f77b4') # experiment 2
-    combined_explainer.plot_dependence("learning_rate", target, '#ff7f0e') # experiment 2
-    combined_explainer.plot_dependence("gamma", target, '#2ca02c') # experiment 2
-
-    # # Experiment 3
-    # combined_param_grid = {'algorithm': [0, 1, 2, 3], 'learning_rate': (0.0001, 0.01), 'gamma': (0.8, 0.999)}    
-    # envs = ["InvertedPendulum", "HalfCheetah", "Hopper", "Walker2d"]
-    
-    # # Create a single explainer for the combined plot
-    # base_explainer = SHAPExplainer(
-    #     param_grid=combined_param_grid,
-    #     results=pd.DataFrame(),  # Empty dataframe, will load per-environment data in the method
-    #     log_dir=log_dir
-    # )
-    
-    # # Generate combined importance plot across environments
-    # base_explainer.plot_combined_importance(envs, target, log_dir)
-    
-    # # Experiment 4
-    # optimal_param_grid = {'learning_rate': (0.0001, 0.01), 'gamma': (0.8, 0.999), 'n_steps': [128, 512, 1024, 2048], 
-    #                       'gae_lambda': (0.9, 0.99), 'vf_coef': (0.5, 1.0)}    
-    # A2C_df = pd.read_csv(os.path.join(log_dir, "A2C_processed_results.csv"))
-    # os.makedirs(os.path.join(log_dir, "optimal_analysis"), exist_ok=True)
-    # optimal_explainer = SHAPExplainer(
-    #     param_grid=optimal_param_grid,
-    #     results=A2C_df,
-    #     log_dir=os.path.join(log_dir, "optimal_analysis")
-    # )    
-    # # Find optimal algorithm and hyperparameters across all results and plot
-    # print("\n=== Finding optimal configuration across all algorithms ===")
-    # optimal_config = optimal_explainer.find_optimal_config_and_plot(target)
+    if args.process == 'all' or args.process == 'process':
+        print("=== Processing results for all algorithms ===")
+        # Process results for each algorithm
+        process_results(rl_param_grids, log_dir)
+    if args.process == 'all' or args.process == 'exp1':
+        print("=== SHAP Analysis for Experiment 1 ===")
+        # # Experiment 1
+        for algorithm, param_grid in rl_param_grids.items():
+            # Read the combined results for each algorithm
+            processed_results = pd.read_csv(f"{log_dir}{algorithm}_processed_results.csv")
+            os.makedirs(os.path.join(log_dir, algorithm), exist_ok=True)
+            print(f"algorithm: {algorithm}")
+            print(f"param_grid: {param_grid}")
+            explainer = SHAPExplainer(param_grid=param_grid, 
+                                    results=processed_results, 
+                                    log_dir=os.path.join(log_dir, algorithm))
+            explainer.plot_summary(algorithm, target)
+    if args.process == 'all' or args.process == 'exp2':
+        print("=== SHAP Analysis for Experiment 2 ===")
+        # Experiment 2
+        combined_param_grid = {'algorithm': [0, 1, 2, 3], 'learning_rate': (0.0001, 0.01), 'gamma': (0.8, 0.999)}    
+        all_algorithms_df = pd.read_csv(os.path.join(log_dir, "all_algorithms_combined_results.csv"))
+        os.makedirs(os.path.join(log_dir, "combined_analysis"), exist_ok=True)
+        combined_explainer = SHAPExplainer(
+            param_grid=combined_param_grid,
+            results=all_algorithms_df,
+            log_dir=os.path.join(log_dir, "combined_analysis")
+        )    
+        combined_explainer.plot_dependence("algorithm", target, '#1f77b4') # experiment 2
+        combined_explainer.plot_dependence("learning_rate", target, '#ff7f0e') # experiment 2
+        combined_explainer.plot_dependence("gamma", target, '#2ca02c') # experiment 2
+    if args.process == 'all' or args.process == 'exp3':
+        print("=== SHAP Analysis for Experiment 3 ===")
+        # Experiment 3
+        combined_param_grid = {'algorithm': [0, 1, 2, 3], 'learning_rate': (0.0001, 0.01), 'gamma': (0.8, 0.999)}    
+        envs = ["InvertedPendulum", "HalfCheetah", "Hopper", "Walker2d"]
+        
+        # Create a single explainer for the combined plot
+        base_explainer = SHAPExplainer(
+            param_grid=combined_param_grid,
+            results=pd.DataFrame(),  # Empty dataframe, will load per-environment data in the method
+            log_dir=log_dir
+        )
+        
+        # Generate combined importance plot across environments
+        base_explainer.plot_combined_importance(envs, target, log_dir)
+    if args.process == 'all' or args.process == 'exp4':
+        print("=== SHAP Analysis for Experiment 4 ===")
+        # Experiment 4
+        optimal_param_grid = {'learning_rate': (0.0001, 0.01), 'gamma': (0.8, 0.999), 'n_steps': [128, 512, 1024, 2048], 
+                            'gae_lambda': (0.9, 0.99), 'vf_coef': (0.5, 1.0)}    
+        A2C_df = pd.read_csv(os.path.join(log_dir, "A2C_processed_results.csv"))
+        os.makedirs(os.path.join(log_dir, "optimal_analysis"), exist_ok=True)
+        optimal_explainer = SHAPExplainer(
+            param_grid=optimal_param_grid,
+            results=A2C_df,
+            log_dir=os.path.join(log_dir, "optimal_analysis")
+        )    
+        # Find optimal algorithm and hyperparameters across all results and plot
+        print("\n=== Finding optimal configuration across all algorithms ===")
+        optimal_config = optimal_explainer.find_optimal_config_and_plot(target)
 
 if __name__ == "__main__":
     main()

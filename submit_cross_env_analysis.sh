@@ -111,7 +111,7 @@ if $RUN_ALL_PAIRS; then
   echo "Running all environment pairs"
   
   # Run the analysis script with all pairs
-  python CrossEnvRLHyperparameterSHAP.py \
+  python CrossEnvRLHyperparameter.py \
     --algorithms ${ALGORITHM} \
     --n_samples ${N_SAMPLES} \
     --train_steps ${TRAIN_STEPS} \
@@ -122,7 +122,7 @@ else
   echo "Run environment pairs: ${ENV_PAIRS}"
   
   # Run the analysis script for a single pair
-  python CrossEnvRLHyperparameterSHAP.py \
+  python CrossEnvRLHyperparameter.py \
     --algorithms ${ALGORITHM} \
     --env_pairs ${ENV_PAIRS} \
     --n_samples ${N_SAMPLES} \
