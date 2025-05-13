@@ -33,3 +33,17 @@ pip install numpy==1.24.0
 pip install 'shimmy>=2.0'
 pip install imageio-ffmpeg
 ```
+
+### Running
+```
+# batch train models
+batch submit_cross_env_analysis.sh (GPU required)
+
+# preprocess results
+python epilen_ratio.py
+python csv_concatenator.py
+
+# SHAP process and analysis
+python SHAPAnalysis.py --process="process"
+python SHAPAnalysis.py --process="all"
+```

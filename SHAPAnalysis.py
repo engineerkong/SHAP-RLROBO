@@ -88,9 +88,11 @@ class SHAPExplainer:
         # Beeswarm plot showing feature impacts
         plt.figure(figsize=(12, 8))
         shap.plots.violin(shap_values, X, plot_type="layered_violin")
-        plt.title(f'SHAP Summary Plot for Gap using {algorithm}')
+        plt.title(f'SHAP Summary Plot on Reward Difference using {algorithm}', fontsize=12)
+        plt.xlabel('SHAP Value', fontsize=10)
+        # plt.ylabel('Feature Value', fontsize=8)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.log_dir, f'shap_summary_{algorithm}.pdf'))
+        plt.savefig(os.path.join(self.log_dir, f'shap_summary_{algorithm}.svg'))
 
     def plot_dependence(self, param_name, target, color, interaction_index=None):
         """
@@ -98,17 +100,22 @@ class SHAPExplainer:
         """
         shap_values, X = self.explain(target)
         
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(10, 6))                  
+        # Create SHAP dependence plot
         shap.dependence_plot(
             param_name, 
             shap_values, 
             X, 
             color=color,
-            interaction_index=interaction_index
-        )
-        plt.title(f'SHAP Dependence Plot for {param_name} on Gap')
+            interaction_index=interaction_index,
+            )
+        # Set y-axis limits to (-1, 2) for ELR
+        # plt.ylim(-1, 2)
+        plt.title(f'SHAP Dependence Plot for {param_name} on Reward Difference')
+        fig = plt.gcf()
+        fig.set_size_inches(10, 6)
         plt.tight_layout()
-        plt.savefig(os.path.join(self.log_dir, f'shap_dependence_{param_name}_{target}.pdf'))
+        plt.savefig(os.path.join(self.log_dir, f'shap_dependence_{param_name}_{target}.svg'))
 
     def plot_importance(self, env, target):
         """
@@ -119,9 +126,9 @@ class SHAPExplainer:
         # Bar plot of feature importance
         plt.figure(figsize=(10, 6))
         shap.summary_plot(shap_values, X, plot_type="bar", color=['red', 'blue', 'yellow'])
-        plt.title(f'SHAP Value Importance for Gap in {env}')
+        plt.title(f'SHAP Value Importance on Reward Difference in {env}')
         plt.tight_layout()
-        plt.savefig(os.path.join(self.log_dir, f'shap_importance_{env}.pdf'))
+        plt.savefig(os.path.join(self.log_dir, f'shap_importance_{env}.svg'))
         
         return shap_values, X  # Return values for combined plots
 
@@ -210,7 +217,7 @@ class SHAPExplainer:
         plt.xticks(range(n_features), features)
         plt.xlabel('Features')
         plt.ylabel('Mean |SHAP Value|')
-        plt.title(f'Combined SHAP Value Importance Across Environments')
+        plt.title(f'SHAP Value Importance Across Environments on Reward Difference')
         
         # Create legend for environments
         env_handles = [plt.Rectangle((0,0),1,1, **env_styles[env], color='gray') for env in environments]
@@ -224,9 +231,9 @@ class SHAPExplainer:
                   fontsize=14, title_fontsize=16)
         
         plt.tight_layout()
-        plt.savefig(os.path.join(log_dir, f'combined_importance_{target}.pdf'))
+        plt.savefig(os.path.join(log_dir, f'combined_importance_{target}.svg'))
         plt.savefig(os.path.join(log_dir, f'combined_importance_{target}.png'))
-        print(f"Saved combined importance plot to {os.path.join(log_dir, f'combined_importance_{target}.pdf')}")
+        print(f"Saved combined importance plot to {os.path.join(log_dir, f'combined_importance_{target}.svg')}")
 
     def plot_interaction(self, param1, param2, target):
         """
@@ -347,9 +354,9 @@ class SHAPExplainer:
             matplotlib=True,
             show=False
         )
-        plt.title(f'Force Plot for Optimal Configuration ({target})')
+        plt.title(f'Force Plot for Optimal Configuration on Reward Difference')
         plt.tight_layout()
-        plt.savefig(os.path.join(self.log_dir, f'optimal_force_{target}.pdf'))
+        plt.savefig(os.path.join(self.log_dir, f'optimal_force_{target}.svg'))
         
         # Return the optimal configuration for reference
         return best_params_dict
@@ -363,7 +370,7 @@ def process_results(rl_param_grids, log_dir):
     algorithm_encoding = {'PPO': 0, 'A2C': 1, 'DDPG': 2, 'SAC': 3}
     env_df = {"InvertedPendulum":pd.DataFrame(), "HalfCheetah":pd.DataFrame(), "Hopper":pd.DataFrame(), "Walker2d":pd.DataFrame()}
     for algorithm, param_grid in rl_param_grids.items():
-        combined_results = pd.read_csv(f"/home/lin30127/workspace/SHAP-RLROBO/results/{algorithm}_combined_results.csv")
+        combined_results = pd.read_csv(f"/results/{algorithm}_combined_results.csv")
         combined_train_reward = combined_results["train_reward"]
         combined_test_reward = combined_results["test_reward"]
 
@@ -392,11 +399,12 @@ def process_results(rl_param_grids, log_dir):
 
 def main():
     parser = argparse.ArgumentParser(description="SHAP Analysis for RL experiments")
-    parser.add_argument('--process', type=str, help='Process to be chosen', default='all')
+    parser.add_argument('--process', type=str, help='Process to be chosen: process/all.', default='all')
+    parser.add_argument('--target', type=str, help='Target variable for analysis: gap/epilen_ratio.', default='gap')
     args = parser.parse_args()
 
-    log_dir = "/home/lin30127/workspace/SHAP-RLROBO/results/experiments/"
-    target = "gap"  # Use the gap as the target variable for analysis  
+    log_dir = "results/experiment"
+    target = args.target  # Use the gap as the target variable for analysis  
 
     rl_param_grids = {
         'PPO': {
@@ -428,7 +436,7 @@ def main():
             'ent_coef': (0.1, 1.0)
         }
     }
-    if args.process == 'all' or args.process == 'process':
+    if args.process == 'process':
         print("=== Processing results for all algorithms ===")
         # Process results for each algorithm
         process_results(rl_param_grids, log_dir)
