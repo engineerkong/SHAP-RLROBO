@@ -52,7 +52,7 @@ python shap_analysis_pipeline.py
 The SHAP analysis pipeline includes:
 - **Main Impacts** - Compare configuration (algorithms, hyperparameters) impacts
 - **Interaction Impacts** - Examine hyperparameter interactions within algorithms
-- **Task and Environment Insights** - Analyze performance on robotic tasks across MuJoCo/PyBullet
+- **Task/Environment Insights** - Analyze performance on robotic tasks across MuJoCo/PyBullet
 - **Configuration Selection Validation** - Identify top-performing hyperparameter configurations
 
 ## Output
