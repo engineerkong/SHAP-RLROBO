@@ -1,5 +1,5 @@
 # SHAP-RLROBO
-Repository for manuscript "Optimizing RL Generalizability in Robotics through SHAP Analysis of Algorithms and Hyperparameters"
+Repository for manuscript **"Optimizing RL Generalizability in Robotics through SHAP Analysis of Algorithms and Hyperparameters"**
 
 ### Installation
 ```bash
