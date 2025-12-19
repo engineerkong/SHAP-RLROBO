@@ -1,30 +1,26 @@
 # SHAP-RLROBO
-SHAP Analysis of RL Generalization across Robotic Environments
+Repository for manuscript "Optimizing RL Generalizability in Robotics through SHAP Analysis of Algorithms and Hyperparameters"
 
 ### Installation
 ```
-# MUJOCO python3.9
+# MUJOCO
 https://github.com/openai/mujoco-py?tab=readme-ov-file#install-mujoco
 pip install gymnasium[mujoco]
 ```
 
 ```
-# PYBULLET python3.9
+# PYBULLET
 pip install gym==0.22.0
 git clone https://github.com/benelot/pybullet-gym.git
 cd pybullet-gym
 pip install -e .
-pip install numpy==1.24.0 # change numpy version to avoid error
 ```
 
 ```
-# STABLE-BASELINES3
+# STABLE-BASELINES3, SHAP and SEABORN
 pip install stable-baselines3[extra]
-```
-
-```
-# SHAP
 pip install shap
+pip install seaborn
 ```
 
 ```
