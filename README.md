@@ -1,5 +1,9 @@
 # SHAP-RLROBO
-Repository for manuscript **"Enhancing RL Generalizability in Robotics through SHAP Analysis of Algorithms and Hyperparameters"**
+### 🎉 Accepted by ICPR-2026
+Repository for paper **"Enhancing RL Generalizability in Robotics through SHAP Analysis of Algorithms and Hyperparameters"**.
+
+Preprint link:
+
 
 ### Installation
 ```bash
